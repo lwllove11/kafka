@@ -449,8 +449,7 @@ class Partition(val topicPartition: TopicPartition,
           // This is because if the broker previously wrote it to file, it would be recovered on restart after failure.
           // Topic ID is consistent since we are just setting it here.
           if (log.topicId == Uuid.ZERO_UUID) {
-            log.partitionMetadataFile.write(requestTopicId)
-            log.topicId = requestTopicId
+            log.assignTopicId(requestTopicId)
             true
           } else if (log.topicId != requestTopicId) {
             stateChangeLogger.error(s"Topic Id in memory: ${log.topicId} does not" +
@@ -1107,6 +1106,12 @@ class Partition(val topicPartition: TopicPartition,
       if (epochEndOffset.endOffset == UNDEFINED_EPOCH_OFFSET || epochEndOffset.leaderEpoch == UNDEFINED_EPOCH) {
         throw new OffsetOutOfRangeException("Could not determine the end offset of the last fetched epoch " +
           s"$lastFetchedEpoch from the request")
+      }
+
+      // If fetch offset is less than log start, fail with OffsetOutOfRangeException, regardless of whether epochs are diverging
+      if (fetchOffset < initialLogStartOffset) {
+        throw new OffsetOutOfRangeException(s"Received request for offset $fetchOffset for partition $topicPartition, " +
+          s"but we only have log segments in the range $initialLogStartOffset to $initialLogEndOffset.")
       }
 
       if (epochEndOffset.leaderEpoch < fetchEpoch || epochEndOffset.endOffset < fetchOffset) {
