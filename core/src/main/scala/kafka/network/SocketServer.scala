@@ -673,16 +673,21 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
    * Listen for new connections and assign accepted connections to processors using round-robin.
    */
   private def acceptNewConnections(): Unit = {
+    // 每500ms 读取底层通道上准备就绪I/O操作的数量
     val ready = nioSelector.select(500)
+    // 如果存在准备就绪的I/O事件
     if (ready > 0) {
+      // 获取对应的SelectionKey集合
       val keys = nioSelector.selectedKeys()
+      // 遍历这些SelectionKey
       val iter = keys.iterator()
       while (iter.hasNext && isRunning) {
         try {
           val key = iter.next
           iter.remove()
-
+          // 测试SelectionKey的底层通道是否能够接受新Socket连接
           if (key.isAcceptable) {
+            // 接受此连接并分配对应的Processor线程
             accept(key).foreach { socketChannel =>
               // Assign the channel to the next processor (using round-robin) to which the
               // channel can be added without blocking. If newConnections queue is full on
@@ -698,6 +703,8 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
                   processors(currentProcessorIndex)
                 }
                 currentProcessorIndex += 1
+                // 将新Socket连接加入到Processor线程待处理连接队列
+                // 等待Processor线程后续处理
               } while (!assignNewConnection(socketChannel, processor, retriesLeft == 0))
             }
           } else
@@ -1005,8 +1012,10 @@ private[kafka] class Processor(val id: Int,
   }
 
   private def processCompletedReceives(): Unit = {
+    // 从Selector中提取已接收到的所有请求数据
     selector.completedReceives.forEach { receive =>
       try {
+        // 打开与发送方对应的Socket Channel，如果不存在可用的Channel，抛出异常
         openOrClosingChannel(receive.source) match {
           case Some(channel) =>
             val header = parseRequestHeader(receive.payload)
@@ -1025,7 +1034,7 @@ private[kafka] class Processor(val id: Int,
                 val context = new RequestContext(header, connectionId, channel.socketAddress,
                   channel.principal, listenerName, securityProtocol,
                   channel.channelMetadataRegistry.clientInformation, isPrivilegedListener, channel.principalSerde)
-
+                // 根据Channel中获取的Receive对象，构建Request对象
                 val req = new RequestChannel.Request(processor = id, context = context,
                   startTimeNanos = nowNanos, memoryPool, receive.payload, requestChannel.metrics, None)
 
@@ -1039,6 +1048,7 @@ private[kafka] class Processor(val id: Int,
                       apiVersionsRequest.data.clientSoftwareVersion))
                   }
                 }
+                // 将该请求放入请求队列
                 requestChannel.sendRequest(req)
                 selector.mute(connectionId)
                 handleChannelMuteEvent(connectionId, ChannelMuteEvent.REQUEST_RECEIVED)

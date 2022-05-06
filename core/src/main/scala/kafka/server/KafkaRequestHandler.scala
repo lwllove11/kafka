@@ -37,6 +37,12 @@ trait ApiRequestHandler {
 /**
  * A thread that answers kafka requests.
  */
+// 关键字段说明
+// id: I/O线程序号
+// brokerId：所在Broker序号，即broker.id值
+// totalHandlerThreads：I/O线程池大小
+// requestChannel：请求处理通道
+// apis：KafkaApis类，用于真正实现请求处理逻辑的类
 class KafkaRequestHandler(id: Int,
                           brokerId: Int,
                           val aggregateIdleMeter: Meter,
@@ -96,7 +102,10 @@ class KafkaRequestHandler(id: Int,
   def awaitShutdown(): Unit = shutdownComplete.await()
 
 }
-
+// brokerId：所属Broker的序号，即broker.id值
+// requestChannel：SocketServer组件下的RequestChannel对象
+// api：KafkaApis类，实际请求处理逻辑类
+// numThreads：I/O线程池初始大小
 class KafkaRequestHandlerPool(val brokerId: Int,
                               val requestChannel: RequestChannel,
                               val apis: ApiRequestHandler,
