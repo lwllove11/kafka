@@ -213,12 +213,12 @@ class ControllerChannelManager(controllerContext: ControllerContext,
 case class QueueItem(apiKey: ApiKeys, request: AbstractControlRequest.Builder[_ <: AbstractControlRequest],
                      callback: AbstractResponse => Unit, enqueueTimeMs: Long)
 
-class RequestSendThread(val controllerId: Int,
-                        val controllerContext: ControllerContext,
-                        val queue: BlockingQueue[QueueItem],
-                        val networkClient: NetworkClient,
-                        val brokerNode: Node,
-                        val config: KafkaConfig,
+class RequestSendThread(val controllerId: Int, // Controller所在Broker的Id
+                        val controllerContext: ControllerContext, // Controller元数据信息
+                        val queue: BlockingQueue[QueueItem], // 请求阻塞队列
+                        val networkClient: NetworkClient, // 用于执行发送的网络I/O类
+                        val brokerNode: Node, // 目标Broker节点
+                        val config: KafkaConfig, // Kafka配置信息
                         val time: Time,
                         val requestRateAndQueueTimeMetrics: Timer,
                         val stateChangeLogger: StateChangeLogger,
