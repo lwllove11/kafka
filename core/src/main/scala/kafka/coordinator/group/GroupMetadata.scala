@@ -176,6 +176,7 @@ case class GroupSummary(state: String,
   * information of the commit record offset, compaction of the offsets topic itself may result in the wrong offset commit
   * being materialized.
   */
+// appendedBatchOffset：保存的是位移主题消息自己的位移值； offsetAndMetadata：保存的是位移提交消息中保存的消费者组的位移值。
 case class CommitRecordMetadataAndOffset(appendedBatchOffset: Option[Long], offsetAndMetadata: OffsetAndMetadata) {
   def olderThan(that: CommitRecordMetadataAndOffset): Boolean = appendedBatchOffset.get < that.appendedBatchOffset.get
 }
@@ -226,8 +227,9 @@ private[group] class GroupMetadata(val groupId: String, initialState: GroupState
   var newMemberAdded: Boolean = false
 
   def inLock[T](fun: => T): T = CoreUtils.inLock(lock)(fun)
-
+  // 判断消费者组状态是指定状态
   def is(groupState: GroupState) = state == groupState
+  // 判断消费者组状态不是指定状态
   def not(groupState: GroupState) = state != groupState
   def has(memberId: String) = members.contains(memberId)
   def get(memberId: String) = members(memberId)
@@ -240,21 +242,29 @@ private[group] class GroupMetadata(val groupId: String, initialState: GroupState
   def isConsumerGroup: Boolean = protocolType.contains(ConsumerProtocol.PROTOCOL_TYPE)
 
   def add(member: MemberMetadata, callback: JoinCallback = null): Unit = {
+    // 如果是要添加的第一个消费者组成员
     if (members.isEmpty)
+    // 就把该成员的procotolType设置为消费者组的protocolType
       this.protocolType = Some(member.protocolType)
 
     assert(this.protocolType.orNull == member.protocolType)
+    // 确保该成员选定的分区分配策略与组选定的分区分配策略相匹配
     assert(supportsProtocols(member.protocolType, MemberMetadata.plainProtocolSet(member.supportedProtocols)))
-
+    // 如果尚未选出Leader成员
     if (leaderId.isEmpty)
+    // 把该成员设定为Leader成员
       leaderId = Some(member.memberId)
+    // 将该成员添加进members
     members.put(member.memberId, member)
+    // 更新分区分配策略支持票数
     member.supportedProtocols.foreach{ case (protocol, _) => supportedProtocols(protocol) += 1 }
+    // 设置成员加入组后的回调逻辑
     member.awaitingJoinCallback = callback
+    // 更新已加入组的成员数
     if (member.isAwaitingJoin)
       numMembersAwaitingJoin += 1
   }
-
+  // 从members中移除给定成员
   def remove(memberId: String): Unit = {
     members.remove(memberId).foreach { member =>
       member.supportedProtocols.foreach{ case (protocol, _) => supportedProtocols(protocol) -= 1 }
@@ -378,6 +388,7 @@ private[group] class GroupMetadata(val groupId: String, initialState: GroupState
     pendingSyncMembers.clear()
   }
 
+  // 查询状态
   def currentState = state
 
   def notYetRejoinedMembers = members.filter(!_._2.isAwaitingJoin).toMap
@@ -433,12 +444,16 @@ private[group] class GroupMetadata(val groupId: String, initialState: GroupState
     } else
       false
   }
-
+  // 消费者组能否Rebalance的条件是当前状态是PreparingRebalance状态的合法前置状态
   def canRebalance = PreparingRebalance.validPreviousStates.contains(state)
 
+  // 设置/更新 组状态
   def transitionTo(groupState: GroupState): Unit = {
+    // 确保是合法的状态转换
     assertValidTransition(groupState)
+    // 设置状态到给定状态
     state = groupState
+    // 更新状态变更时间戳
     currentStateTimestamp = Some(time.milliseconds())
   }
 

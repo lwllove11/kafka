@@ -57,15 +57,18 @@ private[group] class MemberMetadata(var memberId: String,
                                     val groupInstanceId: Option[String],
                                     val clientId: String,
                                     val clientHost: String,
-                                    val rebalanceTimeoutMs: Int,
-                                    val sessionTimeoutMs: Int,
-                                    val protocolType: String,
-                                    var supportedProtocols: List[(String, Array[Byte])],
-                                    var assignment: Array[Byte] = Array.empty[Byte]) {
-
+                                    val rebalanceTimeoutMs: Int, // Rebalane操作超时时间
+                                    val sessionTimeoutMs: Int,   // 会话超时时间
+                                    val protocolType: String,    // 对消费者组而言，是"consumer"
+                                    var supportedProtocols: List[(String, Array[Byte])], // 成员配置的多套分区分配策略
+                                    var assignment: Array[Byte] = Array.empty[Byte]) {   // 保存分配给该成员的分区分配方案
+  // 表示组成员是否正在等待加入组
   var awaitingJoinCallback: JoinGroupResult => Unit = null
+  // 表示组成员是否正在等待 GroupCoordinator 发送分配方案。
   var awaitingSyncCallback: SyncGroupResult => Unit = null
+  // 表示组成员是否发起“退出组”的操作。
   var isLeaving: Boolean = false
+  // 表示是否是消费者组下的新成员。
   var isNew: Boolean = false
 
   def isStaticMember: Boolean = groupInstanceId.isDefined

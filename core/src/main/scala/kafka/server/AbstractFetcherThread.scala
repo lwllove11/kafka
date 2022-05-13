@@ -53,16 +53,17 @@ import scala.math._
 /**
  *  Abstract class for fetching data from multiple partitions from the same broker.
  */
-abstract class AbstractFetcherThread(name: String,
-                                     clientId: String,
-                                     val sourceBroker: BrokerEndPoint,
-                                     failedPartitions: FailedPartitions,
-                                     fetchBackOffMs: Int = 0,
-                                     isInterruptible: Boolean = true,
-                                     val brokerTopicStats: BrokerTopicStats) //BrokerTopicStats's lifecycle managed by ReplicaManager
+abstract class AbstractFetcherThread(name: String, // 线程名称
+                                     clientId: String, // Client Id，用于日志输出
+                                     val sourceBroker: BrokerEndPoint, // 数据源Broker地址
+                                     failedPartitions: FailedPartitions, // 处理过程中出现失败的分区
+                                     fetchBackOffMs: Int = 0, // 获取操作重试间隔
+                                     isInterruptible: Boolean = true, // 线程是否允许被中断
+                                     val brokerTopicStats: BrokerTopicStats) //BrokerTopicStats's lifecycle managed by ReplicaManager，// Broker端主题监控指标
   extends ShutdownableThread(name, isInterruptible) {
-
+  // 定义FetchData类型表示获取的消息数据
   type FetchData = FetchResponse.PartitionData[Records]
+  // 定义EpochData类型表示Leader Epoch数据
   type EpochData = OffsetForLeaderEpochRequestData.OffsetForLeaderPartition
 
   private val partitionStates = new PartitionStates[PartitionFetchState]
@@ -852,13 +853,13 @@ case class PartitionFetchState(fetchOffset: Long,
                                delay: Option[DelayedItem],
                                state: ReplicaState,
                                lastFetchedEpoch: Option[Int]) {
-
+  // 分区可获取的条件是副本处于Fetching且未被推迟执行
   def isReadyForFetch: Boolean = state == Fetching && !isDelayed
-
+  // 副本处于ISR的条件：没有lag
   def isReplicaInSync: Boolean = lag.isDefined && lag.get <= 0
-
+  // 分区处于截断中状态的条件：副本处于Truncating状态且未被推迟执行
   def isTruncating: Boolean = state == Truncating && !isDelayed
-
+  // 分区被推迟获取数据的条件：存在未过期的延迟任务
   def isDelayed: Boolean = delay.exists(_.getDelay(TimeUnit.MILLISECONDS) > 0)
 
   override def toString: String = {

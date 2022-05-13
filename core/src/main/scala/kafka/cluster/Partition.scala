@@ -875,9 +875,13 @@ class Partition(val topicPartition: TopicPartition,
    *
    * @return true if the HW was incremented, and false otherwise.
    */
+  //note: 检查是否需要更新 partition 的 HW,这个方法将在两种情况下触发:
+  //note: 1.Partition ISR 变动; 2. 任何副本的 LEO 改变;
+  //note: 在获取 HW 时,是从 isr 和认为能追得上的副本中选择最小的 LEO,之所以也要从能追得上的副本中选择,是为了等待 follower 追上 HW,否则可能没机会追上了
   private def maybeIncrementLeaderHW(leaderLog: Log, curTime: Long = time.milliseconds): Boolean = {
     // maybeIncrementLeaderHW is in the hot path, the following code is written to
     // avoid unnecessary collection generation
+    // 获取 isr 以及能够追上 isr （认为最近一次 fetch 的时间在 replica.lag.time.max.time 之内） 副本的 LEO 信息。
     var newHighWatermark = leaderLog.logEndOffsetMetadata
     remoteReplicasMap.values.foreach { replica =>
       // Note here we are using the "maximal", see explanation above
