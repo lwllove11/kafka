@@ -521,13 +521,17 @@ class ZkPartitionStateMachine(config: KafkaConfig,
 
 object PartitionLeaderElectionAlgorithms {
   def offlinePartitionLeaderElection(assignment: Seq[Int], isr: Seq[Int], liveReplicas: Set[Int], uncleanLeaderElectionEnabled: Boolean, controllerContext: ControllerContext): Option[Int] = {
+    // 从当前分区副本列表中寻找首个处于存活状态的ISR副本
     assignment.find(id => liveReplicas.contains(id) && isr.contains(id)).orElse {
+      // 如果找不到满足条件的副本，查看是否允许Unclean Leader选举，即Broker端参数unclean.leader.election.enable是否等于true
       if (uncleanLeaderElectionEnabled) {
+        // 选择当前副本列表中的第一个存活副本作为Leader
         val leaderOpt = assignment.find(liveReplicas.contains)
         if (leaderOpt.isDefined)
           controllerContext.stats.uncleanLeaderElectionRate.mark()
         leaderOpt
       } else {
+        // 如果不允许Unclean Leader选举，则返回None表示无法选举Leader
         None
       }
     }
@@ -546,10 +550,15 @@ object PartitionLeaderElectionAlgorithms {
   }
 }
 
+// 分区Leader选举策略接口
 sealed trait PartitionLeaderElectionStrategy
+// 离线分区Leader选举策略
 final case class OfflinePartitionLeaderElectionStrategy(allowUnclean: Boolean) extends PartitionLeaderElectionStrategy
+// 分区副本重分配Leader选举策略
 final case object ReassignPartitionLeaderElectionStrategy extends PartitionLeaderElectionStrategy
+// 分区Preferred副本Leader选举策略
 final case object PreferredReplicaPartitionLeaderElectionStrategy extends PartitionLeaderElectionStrategy
+// Broker Controlled关闭时Leader选举策略
 final case object ControlledShutdownPartitionLeaderElectionStrategy extends PartitionLeaderElectionStrategy
 
 sealed trait PartitionState {
