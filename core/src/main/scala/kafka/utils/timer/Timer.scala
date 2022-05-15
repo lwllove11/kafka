@@ -25,6 +25,7 @@ import org.apache.kafka.common.utils.{KafkaThread, Time}
 
 trait Timer {
   /**
+    * 将给定的定时任务插入到时间轮上，等待后续延迟执行
     * Add a new task to this executor. It will be executed after the task's delay
     * (beginning from the time of submission)
     * @param timerTask the task to add
@@ -32,6 +33,7 @@ trait Timer {
   def add(timerTask: TimerTask): Unit
 
   /**
+    * 向前推进时钟，执行已达过期时间的延迟任务
     * Advance the internal clock, executing any tasks whose expiration has been
     * reached within the duration of the passed timeout.
     * @param timeoutMs

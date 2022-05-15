@@ -123,21 +123,26 @@ private[timer] class TimingWheel(tickMs: Long, wheelSize: Int, startMs: Long, ta
   }
 
   def add(timerTaskEntry: TimerTaskEntry): Boolean = {
+    // 获取定时任务的过期时间戳
     val expiration = timerTaskEntry.expirationMs
-
+    // 如果该任务已然被取消了，则无需添加，直接返回
     if (timerTaskEntry.cancelled) {
       // Cancelled
       false
+      // 如果该任务超时时间已过期
     } else if (expiration < currentTime + tickMs) {
       // Already expired
       false
+      // 如果该任务超时时间在本层时间轮覆盖时间范围内
     } else if (expiration < currentTime + interval) {
       // Put in its own bucket
       val virtualId = expiration / tickMs
+      // 计算要被放入到哪个Bucket中
       val bucket = buckets((virtualId % wheelSize.toLong).toInt)
+      // 添加到Bucket中
       bucket.add(timerTaskEntry)
-
-      // Set the bucket expiration time
+      // 设置Bucket过期时间
+      // 如果该时间变更过，说明Bucket是新建或被重用，将其加回到DelayQueue
       if (bucket.setExpiration(virtualId * tickMs)) {
         // The bucket needs to be enqueued because it was an expired bucket
         // We only need to enqueue the bucket when its expiration time has changed, i.e. the wheel has advanced
@@ -147,9 +152,11 @@ private[timer] class TimingWheel(tickMs: Long, wheelSize: Int, startMs: Long, ta
         queue.offer(bucket)
       }
       true
+      // 本层时间轮无法容纳该任务，交由上层时间轮处理
     } else {
-      // Out of the interval. Put it into the parent timer
+      // 按需创建上层时间轮
       if (overflowWheel == null) addOverflowWheel()
+      // 加入到上层时间轮中
       overflowWheel.add(timerTaskEntry)
     }
   }
